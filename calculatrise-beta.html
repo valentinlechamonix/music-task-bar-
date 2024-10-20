@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Lecteur Audio avec Visualisation</title>
+    <style>
+        body {
+            font-family: 'Arial', sans-serif;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            height: 100vh;
+            margin: 0;
+            background-color: #f5f5f5;
+        }
+
+        .player-controls {
+            display: flex;
+            align-items: center;
+            margin-top: 20px;
+        }
+
+        button {
+            padding: 10px;
+            margin: 0 5px;
+            cursor: pointer;
+        }
+
+        .volume-slider {
+            width: 150px;
+            margin-left: 15px;
+        }
+
+        /* Style des barres de visualisation */
+        .bars-container {
+            display: flex;
+            justify-content: space-around;
+            width: 300px;
+            height: 150px;
+            margin-top: 30px;
+        }
+
+        .bar {
+            width: 30px;
+            background-color: #000;
+            border: 1px solid #000;
+            transition: height 0.1s ease;
+        }
+
+        /* Icône de musique et paramètres */
+        .settings-icon, .music-icon {
+            position: absolute;
+            top: 20px;
+            font-size: 30px;
+            cursor: pointer;
+        }
+
+        .settings-icon {
+            right: 20px;
+        }
+
+        .music-icon {
+            right: 70px;
+        }
+
+        /* Fenêtre modale pour les paramètres */
+        .settings-modal {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: rgba(0, 0, 0, 0.5);
+            display: none;
+            justify-content: center;
+            align-items: center;
+        }
+
+        .settings-modal .modal-content {
+            background-color: white;
+            padding: 20px;
+            border-radius: 10px;
+            width: 300px;
+            text-align: center;
+        }
+
+        .close-btn {
+            float: right;
+            cursor: pointer;
+        }
+
+        .contact-info {
+            margin-top: 10px;
+            font-size: 14px;
+        }
+
+        .beta-info {
+            margin-top: 15px;
+            color: red;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Visualisation des barres audio -->
+    <div class="bars-container">
+        <div class="bar" id="bar1"></div>
+        <div class="bar" id="bar2"></div>
+        <div class="bar" id="bar3"></div>
+        <div class="bar" id="bar4"></div>
+        <div class="bar" id="bar5"></div>
+    </div>
+
+    <!-- Boutons de contrôle audio -->
+    <div class="player-controls">
+        <button id="playBtn">Play</button>
+        <button id="pauseBtn">Pause</button>
+        <button id="stopBtn">Stop</button>
+        <input type="range" id="volumeSlider" class="volume-slider" min="0" max="1" step="0.1" value="0.5">
+    </div>
+
+    <!-- Icône de musique -->
+    <div class="music-icon" onclick="chooseMusic()">🎵</div>
+    <input type="file" id="musicInput" style="display: none;" accept="audio/*" onchange="loadMusic()">
+
+    <!-- Paramètres -->
+    <div class="settings-icon" onclick="toggleSettings()">⚙️</div>
+
+    <!-- Modal paramètres -->
+    <div class="settings-modal" id="settingsModal">
+        <div class="modal-content">
+            <span class="close-btn" onclick="toggleSettings()">✖</span>
+            <h3>Paramètres</h3>
+            <label for="volume">Volume</label>
+            <input type="range" id="volume" class="volume-slider" min="0" max="1" step="0.1" value="0.5" onchange="changeVolume(this.value)">
+            <div class="contact-info">
+                <p>Pour nous contacter:</p>
+                <p>Email: <a href="mailto:calculatrice@calculatrice.fr">calculatrice@calculatrice.fr</a></p>
+            </div>
+            <div class="beta-info">
+                <p><strong>Version Bêta</strong></p>
+            </div>
+        </div>
+    </div>
+
+    <!-- Musique -->
+    <audio id="backgroundMusic" preload="auto" loop></audio>
+
+    <script>
+        let audioContext, analyser, dataArray, source, bars, music;
+        let isPlaying = false;
+
+        // Initialiser les barres audio et l'audio context
+        function initBars() {
+            audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            analyser = audioContext.createAnalyser();
+            bars = Array.from(document.getElementsByClassName('bar'));
+
+            analyser.fftSize = 64; // Nombre de fréquences analysées
+            const bufferLength = analyser.frequencyBinCount;
+            dataArray = new Uint8Array(bufferLength);
+
+            source = audioContext.createMediaElementSource(music);
+            source.connect(analyser);
+            analyser.connect(audioContext.destination);
+        }
+
+        // Visualiser le son avec les barres
+        function visualizeBars() {
+            requestAnimationFrame(visualizeBars);
+            analyser.getByteFrequencyData(dataArray);
+
+            bars.forEach((bar, i) => {
+                const barHeight = dataArray[i] / 2;
+                bar.style.height = `${barHeight}px`;
+            });
+        }
+
+        // Jouer la musique
+        function playMusic() {
+            if (!isPlaying) {
+                music.play();
+                audioContext.resume();
+                isPlaying = true;
+                visualizeBars();
+            }
+        }
+
+        // Mettre la musique en pause
+        function pauseMusic() {
+            music.pause();
+            isPlaying = false;
+        }
+
+        // Arrêter la musique et réinitialiser
+        function stopMusic() {
+            music.pause();
+            music.currentTime = 0;
+            isPlaying = false;
+        }
+
+        // Changer le volume de la musique
+        document.getElementById('volumeSlider').addEventListener('input', function() {
+            music.volume = this.value;
+        });
+
+        // Choisir un fichier audio
+        function chooseMusic() {
+            document.getElementById('musicInput').click();
+        }
+
+        // Charger et jouer une musique de l'utilisateur
+        function loadMusic() {
+            const file = document.getElementById('musicInput').files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    music.src = e.target.result;
+                    playMusic(); // Jouer automatiquement la musique après le chargement
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // Afficher/masquer les paramètres
+        function toggleSettings() {
+            const modal = document.getElementById('settingsModal');
+            modal.style.display = modal.style.display === 'flex' ? 'none' : 'flex';
+        }
+
+        // Lorsque la page est prête
+        window.onload = function() {
+            music = document.getElementById('backgroundMusic');
+            initBars();
+
+            // Contrôles
+            document.getElementById('playBtn').addEventListener('click', playMusic);
+            document.getElementById('pauseBtn').addEventListener('click', pauseMusic);
+            document.getElementById('stopBtn').addEventListener('click', stopMusic);
+
+            // Musiques par défaut
+            const defaultTracks = [
+                'https://www.bensound.com/bensound-music/bensound-ukulele.mp3',  // Exemple musique 1
+                'https://www.bensound.com/bensound-music/bensound-sunny.mp3'    // Exemple musique 2
+            ];
+
+            // Charger une musique par défaut
+            music.src = defaultTracks[0];
+        };
+    </script>
+</body>
+</html>
